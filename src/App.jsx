@@ -6,6 +6,7 @@ const App = () => {
   const [receivedData, setReceivedData] = useState('');
   const [error, setError] = useState('');
   const [fileInput, setFileInput] = useState(null);
+  const [chunkSize, setchunkSize] = useState(512);
 
   const connectToDevice = async () => {
     try {
@@ -55,7 +56,6 @@ const App = () => {
     const file = fileInput.files[0];
 
     // Read the file in chunks
-    const chunkSize = 512; // Set the desired chunk size
     const fileReader = new FileReader();
     let offset = 0;
 
@@ -93,6 +93,14 @@ const App = () => {
           <p>Connected to: {device.name}</p>
           <p>Received Data: {receivedData}</p>
           <input type="file" accept=".bin" onChange={(e) => setFileInput(e.target)} />
+          <label>
+            Chunk Size:
+            <input
+              type="number"
+              value={chunkSize}
+              onChange={(e) => setchunkSize(parseInt(e.target.value, 10))}
+            />
+          </label>
           <button onClick={sendFile}>Send File</button>
           <button onClick={disconnectDevice}>Disconnect</button>
         </div>
