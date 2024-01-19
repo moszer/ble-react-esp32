@@ -10,7 +10,7 @@ const App = () => {
   const connectToDevice = async () => {
     try {
       const device = await navigator.bluetooth.requestDevice({
-        acceptAllDevices: true,
+        filters: [{ name: 'ESP32 dev' }],
       });
 
       const server = await device.gatt.connect();
