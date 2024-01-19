@@ -84,11 +84,6 @@ const App = () => {
     readNextChunk();
   };
 
-  useEffect(() => {
-    // Cleanup on component unmount
-    //return () => disconnectDevice();
-  }, []);
-
   return (
     <div>
       <h1>React BLE Web App</h1>
