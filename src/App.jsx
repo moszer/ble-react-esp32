@@ -93,6 +93,9 @@ const App = () => {
           <p>Connected to: {device.name}</p>
           <p>Received Data: {receivedData}</p>
           <input type="file" accept=".bin" onChange={(e) => setFileInput(e.target)} />
+          {fileInput && fileInput.files && fileInput.files.length > 0 && (
+            <p>Selected File Size: {fileInput.files[0].size} bytes</p>
+          )}
           <label>
             Chunk Size:
             <input
