@@ -49,10 +49,7 @@ const App = () => {
 
   const sendFile = async () => {
 
-    const startUpdateString = "START UPDATE";
     const encoder = new TextEncoder();
-    const startUpdateBuffer = encoder.encode(startUpdateString);
-
     const OTA_SIZE = fileInput.files[0].size;
     const START_OTA_SIZE = encoder.encode(OTA_SIZE);
 
@@ -61,7 +58,7 @@ const App = () => {
       return;
     }
 
-    await characteristic.writeValue(startUpdateBuffer);
+    //await characteristic.writeValue(startUpdateBuffer);
     await characteristic.writeValue(START_OTA_SIZE);
 
     const file = fileInput.files[0];
