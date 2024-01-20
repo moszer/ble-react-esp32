@@ -53,15 +53,12 @@ const App = () => {
     const OTA_SIZE = fileInput.files[0].size;
     const START_OTA_SIZE = encoder.encode(OTA_SIZE);
 
-    const START_OTA = "START OTA";
-    const START_OTA_LOAD = encoder.encode(START_OTA);
-
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
       setError('Please select a file');
       return;
     }
 
-    await characteristic.writeValue(START_OTA_LOAD);
+    //await characteristic.writeValue(START_OTA_LOAD);
     await characteristic.writeValue(START_OTA_SIZE);
 
     const file = fileInput.files[0];
