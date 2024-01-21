@@ -7,6 +7,7 @@ const App = () => {
   const [error, setError] = useState('');
   const [fileInput, setFileInput] = useState(null);
   const [chunkSize, setchunkSize] = useState(512);
+  const [callbacksize, setcallbacksize] = useState(0)
 
   const connectToDevice = async () => {
     try {
@@ -14,27 +15,35 @@ const App = () => {
         filters: [{ name: 'ESP32 dev' }],
       });
 
+      console.log('Connecting to GATT server...');
       const server = await device.gatt.connect();
+
+      console.log('Getting primary service...');
       const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
+
+      console.log('Getting ota service...');
       const characteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
+
+      console.log('Getting callback_ota_size...');
+      const callback_ota_size = await service.getCharacteristic('e32d6400-0a1c-43af-a591-8634cc4b7af4');
+
 
       setDevice(device);
       setCharacteristic(characteristic);
 
-      // Set up event listener for characteristic value changes
-      characteristic.addEventListener('characteristicvaluechanged', handleCharacteristicValueChanged);
 
-      // Enable notifications
-      await characteristic.startNotifications();
+      callback_ota_size.addEventListener('characteristicvaluechanged', handle_callback_ota_size);
+      await callback_ota_size.startNotifications();
+
     } catch (error) {
       setError(`Error connecting to BLE device: ${error}`);
     }
   };
 
-  const handleCharacteristicValueChanged = (event) => {
+  const handle_callback_ota_size = (event) => {
     const value = event.target.value;
-    const stringValue = new TextDecoder().decode(value);
-    setReceivedData(stringValue);
+    const ota_size = new TextDecoder().decode(value);
+    setcallbacksize(ota_size);
   };
 
   const disconnectDevice = async () => {
@@ -92,6 +101,13 @@ const App = () => {
     readNextChunk();
   };
 
+  useEffect(() => {
+    if(fileInput){
+      let percent_ota = (callbacksize / fileInput.files[0].size) * 100
+      console.log(percent_ota);
+    }
+  },[callbacksize])
+
   return (
     <div>
       <h1>React BLE Web App</h1>
@@ -100,6 +116,7 @@ const App = () => {
         <div>
           <p>Connected to: {device.name}</p>
           <p>Received Data: {receivedData}</p>
+          <p>Callback Size: {callbacksize}</p>
           <input type="file" accept=".bin" onChange={(e) => setFileInput(e.target)} />
           {fileInput && fileInput.files && fileInput.files.length > 0 && (
             <p>Selected File Size: {fileInput.files[0].size} bytes</p>
