@@ -8,6 +8,9 @@ const App = () => {
   const [fileInput, setFileInput] = useState(null);
   const [chunkSize, setchunkSize] = useState(512);
   const [callbacksize, setcallbacksize] = useState(0)
+  const [parsedData, setParsedData] = useState(null);
+  const [SegmentCallback, setSegmentCallback] = useState(0);
+  const [loadPercent, setLoadpercent] = useState(0)
 
   const connectToDevice = async () => {
     try {
@@ -23,6 +26,7 @@ const App = () => {
 
       console.log('Getting ota service...');
       const characteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
+      console.log('Characteristic Properties:', characteristic.properties);
 
       console.log('Getting callback_ota_size...');
       const callback_ota_size = await service.getCharacteristic('e32d6400-0a1c-43af-a591-8634cc4b7af4');
@@ -43,7 +47,7 @@ const App = () => {
   const handle_callback_ota_size = (event) => {
     const value = event.target.value;
     const ota_size = new TextDecoder().decode(value);
-    setcallbacksize(ota_size);
+    setParsedData(ota_size);
   };
 
   const disconnectDevice = async () => {
@@ -56,10 +60,10 @@ const App = () => {
     }
   };
 
-  const sendFile = async () => {
+const sendFile = async () => {
 
-    const encoder = new TextEncoder();
     const OTA_SIZE = fileInput.files[0].size;
+    const encoder = new TextEncoder();
     const START_OTA_SIZE = encoder.encode(OTA_SIZE);
 
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
@@ -80,7 +84,12 @@ const App = () => {
       const chunk = new Uint8Array(event.target.result);
 
       // Send the chunk to the BLE device
-      await characteristic.writeValue(chunk);
+      try {
+        await characteristic.writeValue(chunk);
+      } catch (error) {
+        console.error('Error writing value to characteristic:', error);
+      }
+      
 
       offset += chunk.length;
 
@@ -99,14 +108,25 @@ const App = () => {
 
     // Start reading the first chunk
     readNextChunk();
-  };
+};
 
   useEffect(() => {
     if(fileInput){
       let percent_ota = (callbacksize / fileInput.files[0].size) * 100
       console.log(percent_ota);
+      setLoadpercent(percent_ota)
     }
-  },[callbacksize])
+    const parsedValue = JSON.parse(parsedData);
+    // Check if parsedValue is not null before accessing properties
+    if (parsedValue !== null && typeof parsedValue === 'object') {
+      console.log(parsedValue);
+      setcallbacksize(parsedValue.ota_size);
+      setReceivedData(parsedValue.msg_status);
+      setSegmentCallback(parsedValue.Segment);
+    } else {
+      console.error('parsedValue is null or not an object');
+    }
+  },[parsedData])
 
   return (
     <div>
@@ -116,7 +136,9 @@ const App = () => {
         <div>
           <p>Connected to: {device.name}</p>
           <p>Received Data: {receivedData}</p>
-          <p>Callback Size: {callbacksize}</p>
+          <p>Ota Size callback: {callbacksize}</p>
+          <p>Segment callback: {SegmentCallback}</p>
+          <p>LOADPERCENT: {loadPercent}</p>
           <input type="file" accept=".bin" onChange={(e) => setFileInput(e.target)} />
           {fileInput && fileInput.files && fileInput.files.length > 0 && (
             <p>Selected File Size: {fileInput.files[0].size} bytes</p>
