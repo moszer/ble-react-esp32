@@ -60,6 +60,7 @@ const App = () => {
     }
   };
 
+
 const sendFile = async () => {
 
     const OTA_SIZE = fileInput.files[0].size;
@@ -101,12 +102,13 @@ const sendFile = async () => {
       }
     };
 
+    // Start reading the first chunk
     const readNextChunk = () => {
       const slice = file.slice(offset, offset + chunkSize);
       fileReader.readAsArrayBuffer(slice);
     };
-
-    // Start reading the first chunk
+    
+    //document.getElementById('sendButton').addEventListener('click', readNextChunk);
     readNextChunk();
 };
 
@@ -153,6 +155,7 @@ const sendFile = async () => {
           </label>
           <button onClick={sendFile}>Send File</button>
           <button onClick={disconnectDevice}>Disconnect</button>
+          <button id='sendButton'>SendNextChunk</button>
         </div>
       ) : (
         <button onClick={connectToDevice}>Connect to BLE Device</button>
