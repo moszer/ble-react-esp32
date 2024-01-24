@@ -6,7 +6,7 @@ const App = () => {
   const [receivedData, setReceivedData] = useState('');
   const [error, setError] = useState('');
   const [fileInput, setFileInput] = useState(null);
-  const [chunkSize, setchunkSize] = useState(256);
+  const [chunkSize, setchunkSize] = useState(512);
   const [callbacksize, setcallbacksize] = useState(0)
   const [parsedData, setParsedData] = useState(null);
   const [SegmentCallback, setSegmentCallback] = useState(0);
@@ -14,58 +14,37 @@ const App = () => {
 
   const connectToDevice = async () => {
     try {
-      const connect = async () => {
-        const device = await navigator.bluetooth.requestDevice({
-          filters: [{ name: 'ESP32 dev' }],
-        });
-  
-        console.log('Connecting to GATT server...');
-        const server = await device.gatt.connect();
-  
-        console.log('Getting primary service...');
-        const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
-  
-        console.log('Getting ota service...');
-        const characteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
-        console.log('Characteristic Properties:', characteristic.properties);
-  
-        console.log('Getting callback_ota_size...');
-        const callbackOtaSize = await service.getCharacteristic('e32d6400-0a1c-43af-a591-8634cc4b7af4');
-  
-        setDevice(device);
-        setCharacteristic(characteristic);
-  
-        callbackOtaSize.addEventListener('characteristicvaluechanged', handleCallbackOtaSize);
-        await callbackOtaSize.startNotifications();
-  
-        // Add event listener for disconnection
-        device.addEventListener('gattserverdisconnected', handleDisconnected);
-  
-        console.log('Connected to device:', device.name);
-      };
-  
-      const handleDisconnected = async (event) => {
-        console.error('Device disconnected. Reconnecting...');
-        setDevice(null);
-        setCharacteristic(null);
-        setReceivedData('');
-        setError('');
-  
-        // Attempt to reconnect after a delay (you can customize the delay)
-        setTimeout(async () => {
-          await connect();
-        }, 2000);
-      };
-  
-      // Initial connection
-      await connect();
+      const device = await navigator.bluetooth.requestDevice({
+        filters: [{ name: 'ESP32 dev' }],
+      });
+
+      console.log('Connecting to GATT server...');
+      const server = await device.gatt.connect();
+
+      console.log('Getting primary service...');
+      const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
+
+      console.log('Getting ota service...');
+      const characteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
+      console.log('Characteristic Properties:', characteristic.properties);
+
+      console.log('Getting callback_ota_size...');
+      const callback_ota_size = await service.getCharacteristic('e32d6400-0a1c-43af-a591-8634cc4b7af4');
+
+
+      setDevice(device);
+      setCharacteristic(characteristic);
+
+
+      callback_ota_size.addEventListener('characteristicvaluechanged', handle_callback_ota_size);
+      await callback_ota_size.startNotifications();
+
     } catch (error) {
       setError(`Error connecting to BLE device: ${error}`);
     }
   };
-  
 
-  const handleCallbackOtaSize = (event) => {
+  const handle_callback_ota_size = (event) => {
     const value = event.target.value;
     const ota_size = new TextDecoder().decode(value);
     setParsedData(ota_size);
@@ -82,56 +61,57 @@ const App = () => {
   };
 
 
-const sendFile = async () => {
-
+  const sendFile = async () => {
     const OTA_SIZE = fileInput.files[0].size;
     const encoder = new TextEncoder();
     const START_OTA_SIZE = encoder.encode(OTA_SIZE);
-
+  
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
       setError('Please select a file');
       return;
     }
-
-    //await characteristic.writeValue(START_OTA_LOAD);
+  
     await characteristic.writeValue(START_OTA_SIZE);
-
+  
     const file = fileInput.files[0];
-
+  
     // Read the file in chunks
     const fileReader = new FileReader();
     let offset = 0;
-
-    fileReader.onload = async (event) => {
-      const chunk = new Uint8Array(event.target.result);
-
-      // Send the chunk to the BLE device
+  
+    const sendChunkWithDelay = async () => {
+      const slice = file.slice(offset, offset + chunkSize);
+      const chunk = new Uint8Array(await readFileAsync(slice));
+      
       try {
         await characteristic.writeValue(chunk);
       } catch (error) {
         console.error('Error writing value to characteristic:', error);
       }
-      
-
+  
       offset += chunk.length;
-
-      // Continue reading the next chunk
+  
+      // Continue reading the next chunk after a delay
       if (offset < file.size) {
-        readNextChunk();
+        setTimeout(sendChunkWithDelay, 100); // Delay of 500 milliseconds
       } else {
         setError('');
       }
     };
-
-    // Start reading the first chunk
-    const readNextChunk = () => {
-      const slice = file.slice(offset, offset + chunkSize);
-      fileReader.readAsArrayBuffer(slice);
+  
+    // Promisify FileReader.readAsArrayBuffer
+    const readFileAsync = (file) => {
+      return new Promise((resolve, reject) => {
+        fileReader.onload = (event) => resolve(event.target.result);
+        fileReader.onerror = (error) => reject(error);
+        fileReader.readAsArrayBuffer(file);
+      });
     };
-    
-    //document.getElementById('sendButton').addEventListener('click', readNextChunk);
-    readNextChunk();
-};
+  
+    // Start sending the first chunk with delay
+    sendChunkWithDelay();
+  };
+  
 
   useEffect(() => {
     if(fileInput){
