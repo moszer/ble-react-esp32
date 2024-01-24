@@ -6,7 +6,7 @@ const App = () => {
   const [receivedData, setReceivedData] = useState('');
   const [error, setError] = useState('');
   const [fileInput, setFileInput] = useState(null);
-  const [chunkSize, setchunkSize] = useState(512);
+  const [chunkSize, setchunkSize] = useState(256);
   const [callbacksize, setcallbacksize] = useState(0)
   const [parsedData, setParsedData] = useState(null);
   const [SegmentCallback, setSegmentCallback] = useState(0);
@@ -14,37 +14,58 @@ const App = () => {
 
   const connectToDevice = async () => {
     try {
-      const device = await navigator.bluetooth.requestDevice({
-        filters: [{ name: 'ESP32 dev' }],
-      });
-
-      console.log('Connecting to GATT server...');
-      const server = await device.gatt.connect();
-
-      console.log('Getting primary service...');
-      const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
-
-      console.log('Getting ota service...');
-      const characteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
-      console.log('Characteristic Properties:', characteristic.properties);
-
-      console.log('Getting callback_ota_size...');
-      const callback_ota_size = await service.getCharacteristic('e32d6400-0a1c-43af-a591-8634cc4b7af4');
-
-
-      setDevice(device);
-      setCharacteristic(characteristic);
-
-
-      callback_ota_size.addEventListener('characteristicvaluechanged', handle_callback_ota_size);
-      await callback_ota_size.startNotifications();
-
+      const connect = async () => {
+        const device = await navigator.bluetooth.requestDevice({
+          filters: [{ name: 'ESP32 dev' }],
+        });
+  
+        console.log('Connecting to GATT server...');
+        const server = await device.gatt.connect();
+  
+        console.log('Getting primary service...');
+        const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
+  
+        console.log('Getting ota service...');
+        const characteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
+        console.log('Characteristic Properties:', characteristic.properties);
+  
+        console.log('Getting callback_ota_size...');
+        const callbackOtaSize = await service.getCharacteristic('e32d6400-0a1c-43af-a591-8634cc4b7af4');
+  
+        setDevice(device);
+        setCharacteristic(characteristic);
+  
+        callbackOtaSize.addEventListener('characteristicvaluechanged', handleCallbackOtaSize);
+        await callbackOtaSize.startNotifications();
+  
+        // Add event listener for disconnection
+        device.addEventListener('gattserverdisconnected', handleDisconnected);
+  
+        console.log('Connected to device:', device.name);
+      };
+  
+      const handleDisconnected = async (event) => {
+        console.error('Device disconnected. Reconnecting...');
+        setDevice(null);
+        setCharacteristic(null);
+        setReceivedData('');
+        setError('');
+  
+        // Attempt to reconnect after a delay (you can customize the delay)
+        setTimeout(async () => {
+          await connect();
+        }, 2000);
+      };
+  
+      // Initial connection
+      await connect();
     } catch (error) {
       setError(`Error connecting to BLE device: ${error}`);
     }
   };
+  
 
-  const handle_callback_ota_size = (event) => {
+  const handleCallbackOtaSize = (event) => {
     const value = event.target.value;
     const ota_size = new TextDecoder().decode(value);
     setParsedData(ota_size);
