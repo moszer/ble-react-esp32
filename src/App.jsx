@@ -61,57 +61,56 @@ const App = () => {
   };
 
 
-  const sendFile = async () => {
+const sendFile = async () => {
+
     const OTA_SIZE = fileInput.files[0].size;
     const encoder = new TextEncoder();
     const START_OTA_SIZE = encoder.encode(OTA_SIZE);
-  
+
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
       setError('Please select a file');
       return;
     }
-  
+
+    //await characteristic.writeValue(START_OTA_LOAD);
     await characteristic.writeValue(START_OTA_SIZE);
-  
+
     const file = fileInput.files[0];
-  
+
     // Read the file in chunks
     const fileReader = new FileReader();
     let offset = 0;
-  
-    const sendChunkWithDelay = async () => {
-      const slice = file.slice(offset, offset + chunkSize);
-      const chunk = new Uint8Array(await readFileAsync(slice));
-      
+
+    fileReader.onload = async (event) => {
+      const chunk = new Uint8Array(event.target.result);
+
+      // Send the chunk to the BLE device
       try {
         await characteristic.writeValue(chunk);
       } catch (error) {
         console.error('Error writing value to characteristic:', error);
       }
-  
+      
+
       offset += chunk.length;
-  
-      // Continue reading the next chunk after a delay
+
+      // Continue reading the next chunk
       if (offset < file.size) {
-        setTimeout(sendChunkWithDelay, 100); // Delay of 500 milliseconds
+        readNextChunk();
       } else {
         setError('');
       }
     };
-  
-    // Promisify FileReader.readAsArrayBuffer
-    const readFileAsync = (file) => {
-      return new Promise((resolve, reject) => {
-        fileReader.onload = (event) => resolve(event.target.result);
-        fileReader.onerror = (error) => reject(error);
-        fileReader.readAsArrayBuffer(file);
-      });
+
+    // Start reading the first chunk
+    const readNextChunk = () => {
+      const slice = file.slice(offset, offset + chunkSize);
+      fileReader.readAsArrayBuffer(slice);
     };
-  
-    // Start sending the first chunk with delay
-    sendChunkWithDelay();
-  };
-  
+    
+    //document.getElementById('sendButton').addEventListener('click', readNextChunk);
+    readNextChunk();
+};
 
   useEffect(() => {
     if(fileInput){
