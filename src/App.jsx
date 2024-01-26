@@ -140,7 +140,7 @@ const sendFile = async () => {
           <p>Received Data: {receivedData}</p>
           <p>Ota Size callback: {callbacksize}</p>
           <p>Segment callback: {SegmentCallback}</p>
-          <p>LOADPERCENT: {loadPercent}</p>
+          <p>LOADPERCENT: {loadPercent.toFixed(2)}</p>
           <input type="file" accept=".bin" onChange={(e) => setFileInput(e.target)} />
           {fileInput && fileInput.files && fileInput.files.length > 0 && (
             <p>Selected File Size: {fileInput.files[0].size} bytes</p>
