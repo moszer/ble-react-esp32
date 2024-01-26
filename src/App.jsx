@@ -10,7 +10,9 @@ const App = () => {
   const [callbacksize, setcallbacksize] = useState(0)
   const [parsedData, setParsedData] = useState(null);
   const [SegmentCallback, setSegmentCallback] = useState(0);
-  const [loadPercent, setLoadpercent] = useState(0)
+  const [loadPercent, setLoadpercent] = useState(0);
+  const [TotalByte, setTotalByte] = useState(0);
+  const [UseByte, setUseByte] = useState(0);
 
   const connectToDevice = async () => {
     try {
@@ -125,41 +127,56 @@ const sendFile = async () => {
       setcallbacksize(parsedValue.ota_size);
       setReceivedData(parsedValue.msg_status);
       setSegmentCallback(parsedValue.Segment);
+      setTotalByte(parsedValue.Total_byte);
+      setUseByte(parsedValue.Use_byte);
     } else {
       console.error('parsedValue is null or not an object');
     }
   },[parsedData])
 
   return (
-    <div>
-      <h1>React BLE Web App</h1>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      {device ? (
-        <div>
-          <p>Connected to: {device.name}</p>
-          <p>Received Data: {receivedData}</p>
-          <p>Ota Size callback: {callbacksize}</p>
-          <p>Segment callback: {SegmentCallback}</p>
-          <p>LOADPERCENT: {loadPercent.toFixed(2)}</p>
-          <input type="file" accept=".bin" onChange={(e) => setFileInput(e.target)} />
-          {fileInput && fileInput.files && fileInput.files.length > 0 && (
-            <p>Selected File Size: {fileInput.files[0].size} bytes</p>
-          )}
-          <label>
-            Chunk Size:
-            <input
-              type="number"
-              value={chunkSize}
-              onChange={(e) => setchunkSize(parseInt(e.target.value, 10))}
-            />
-          </label>
-          <button onClick={sendFile}>Send File</button>
-          <button onClick={disconnectDevice}>Disconnect</button>
-          <button id='sendButton'>SendNextChunk</button>
-        </div>
-      ) : (
-        <button onClick={connectToDevice}>Connect to BLE Device</button>
-      )}
+    <div className="flex items-center justify-center h-screen">
+      <div className='bg-neutral p-5 md:p-10 lg:p-20 rounded-3xl'>
+        {error && <p style={{ color: 'red' }}>{error}</p>}
+        {device ? (
+          <div>
+            <div>
+              <p className="text-lg md:text-xl lg:text-2xl">Connected to: {device.name}</p>
+              <p>Received Data: {receivedData}</p>
+              <p>Ota Size callback: {callbacksize}</p>
+              <p>Segment callback: {SegmentCallback}</p>
+              <p>Total Byte: {TotalByte}</p>
+              <p>Use Byte: {UseByte}</p>
+              <progress className="progress progress-error" value={loadPercent} max="100"></progress>
+              <p>Installing: {loadPercent.toFixed(2)} %</p>
+            </div>
+  
+            <div className='flex flex-col md:flex-row gap-1 pt-4 md:pt-6 lg:pt-9'>
+              <input type="file" accept=".bin" onChange={(e) => setFileInput(e.target)} className="mb-2 md:mb-0" />
+              {fileInput && fileInput.files && fileInput.files.length > 0 && (
+                <p className="mb-2 md:mb-0">Selected File Size: {fileInput.files[0].size} bytes</p>
+              )}
+              <label className="mb-2 md:mb-0">
+                Chunk Size:
+                <input
+                  type="number"
+                  value={chunkSize}
+                  onChange={(e) => setchunkSize(parseInt(e.target.value, 10))}
+                  className="mb-2 md:mb-0 ml-2 md:ml-4"
+                />
+              </label>
+              <button className='btn btn-primary mb-2 md:mb-0 ml-2 md:ml-4' onClick={sendFile}>Send File</button>
+              <button className='btn btn-primary mb-2 md:mb-0 ml-2 md:ml-4' onClick={disconnectDevice}>Disconnect</button>
+              <button className='btn btn-primary mb-2 md:mb-0 ml-2 md:ml-4' id='sendButton'>SendNextChunk</button>
+            </div>
+  
+          </div>
+        ) : (
+          <div className='pt-6 md:pt-10 lg:pt-20'>
+            <button className='btn btn-primary' onClick={connectToDevice}>Connect to BLE Device</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
