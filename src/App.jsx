@@ -6,56 +6,59 @@ const App = () => {
   const [receivedData, setReceivedData] = useState('');
   const [error, setError] = useState('');
   const [fileInput, setFileInput] = useState(null);
-  const [chunkSize, setchunkSize] = useState(128);
-  const [callbacksize, setcallbacksize] = useState(0)
+  const [chunkSize, setChunkSize] = useState(128);
+  const [callbackSize, setCallbackSize] = useState(0);
   const [parsedData, setParsedData] = useState(null);
-  const [SegmentCallback, setSegmentCallback] = useState(0);
-  const [loadPercent, setLoadpercent] = useState(0);
-  const [TotalByte, setTotalByte] = useState(0);
-  const [UseByte, setUseByte] = useState(0);
+  const [segmentCallback, setSegmentCallback] = useState(0);
+  const [loadPercent, setLoadPercent] = useState(0);
+  const [totalByte, setTotalByte] = useState(0);
+  const [useByte, setUseByte] = useState(0);
 
-  const uuid_service = 0x0180;
-  const uuid_rx = 0xDEAD; //uuid to receive data from eap32 0xDEAD
-  const uuid_tx = 0xFEF4; //uuid tx to tranfer data to esp32 0xFEF4
+  const uuidService = 0x0180;
+  const uuidRx = 0xDEAD; // UUID to receive data from ESP32 0xDEAD
+  const uuidTx = 0xFEF4; // UUID to transfer data to ESP32 0xFEF4
 
   const connectToDevice = async () => {
+    if (!navigator.bluetooth) {
+      setError('Bluetooth API is not supported by this browser.');
+      return;
+    }
+
     try {
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ name: 'ESP32 dev' }],
-        //acceptAllDevices: true,
-        optionalServices: [uuid_service]
+        optionalServices: [uuidService]
       });
 
       console.log('Connecting to GATT server...');
       const server = await device.gatt.connect();
 
       console.log('Getting primary service...');
-      const service = await server.getPrimaryService(uuid_service);
+      const service = await server.getPrimaryService(uuidService);
 
-      console.log('Getting ota service...');
-      const characteristic = await service.getCharacteristic(uuid_rx);
+      console.log('Getting OTA service...');
+      const characteristic = await service.getCharacteristic(uuidRx);
       console.log('Characteristic Properties:', characteristic.properties);
 
-      console.log('Getting callback_ota_size...');
-      const callback_ota_size = await service.getCharacteristic(uuid_tx);
-
+      console.log('Getting callback OTA size...');
+      const callbackOtaSize = await service.getCharacteristic(uuidTx);
 
       setDevice(device);
       setCharacteristic(characteristic);
 
-
-      callback_ota_size.addEventListener('characteristicvaluechanged', handle_callback_ota_size);
-      await callback_ota_size.startNotifications();
+      callbackOtaSize.addEventListener('characteristicvaluechanged', handleCallbackOtaSize);
+      await callbackOtaSize.startNotifications();
 
     } catch (error) {
+      console.error(`Error connecting to BLE device: ${error}`);
       setError(`Error connecting to BLE device: ${error}`);
     }
   };
 
-  const handle_callback_ota_size = (event) => {
+  const handleCallbackOtaSize = (event) => {
     const value = event.target.value;
-    const ota_size = new TextDecoder().decode(value);
-    setParsedData(ota_size);
+    const otaSize = new TextDecoder().decode(value);
+    setParsedData(otaSize);
   };
 
   const disconnectDevice = async () => {
@@ -68,41 +71,41 @@ const App = () => {
     }
   };
 
-
-const sendFile = async () => {
-
-    const OTA_SIZE = fileInput.files[0].size;
-    const encoder = new TextEncoder();
-    const START_OTA_SIZE = encoder.encode(OTA_SIZE);
-
+  const sendFile = async () => {
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
       setError('Please select a file');
       return;
     }
 
-    //await characteristic.writeValue(START_OTA_LOAD);
-    await characteristic.writeValue(START_OTA_SIZE);
+    const otaSize = fileInput.files[0].size;
+    const encoder = new TextEncoder();
+    const startOtaSize = encoder.encode(otaSize);
+
+    try {
+      await characteristic.writeValue(startOtaSize);
+    } catch (error) {
+      console.error('Error writing OTA size to characteristic:', error);
+      setError('Error writing OTA size to characteristic');
+      return;
+    }
 
     const file = fileInput.files[0];
-
-    // Read the file in chunks
     const fileReader = new FileReader();
     let offset = 0;
 
     fileReader.onload = async (event) => {
       const chunk = new Uint8Array(event.target.result);
 
-      // Send the chunk to the BLE device
       try {
         await characteristic.writeValue(chunk);
       } catch (error) {
-        console.error('Error writing value to characteristic:', error);
+        console.error('Error writing chunk to characteristic:', error);
+        setError('Error writing chunk to characteristic');
+        return;
       }
-      
 
       offset += chunk.length;
 
-      // Continue reading the next chunk
       if (offset < file.size) {
         readNextChunk();
       } else {
@@ -110,35 +113,38 @@ const sendFile = async () => {
       }
     };
 
-    // Start reading the first chunk
     const readNextChunk = () => {
       const slice = file.slice(offset, offset + chunkSize);
       fileReader.readAsArrayBuffer(slice);
     };
-    
-    //document.getElementById('sendButton').addEventListener('click', readNextChunk);
+
     readNextChunk();
-};
+  };
 
   useEffect(() => {
-    if(fileInput){
-      let percent_ota = (callbacksize / fileInput.files[0].size) * 100
-      console.log(percent_ota);
-      setLoadpercent(percent_ota)
+    if (parsedData) {
+      try {
+        const parsedValue = JSON.parse(parsedData);
+        if (parsedValue && typeof parsedValue === 'object') {
+          console.log(parsedValue);
+          setCallbackSize(parsedValue.ota_size);
+          setReceivedData(parsedValue.msg_status);
+          setSegmentCallback(parsedValue.Segment);
+          setTotalByte(parsedValue.Total_byte);
+          setUseByte(parsedValue.Use_byte);
+          if (fileInput) {
+            const percentOta = (parsedValue.ota_size / fileInput.files[0].size) * 100;
+            setLoadPercent(percentOta);
+          }
+        } else {
+          console.error('Parsed value is null or not an object');
+        }
+      } catch (error) {
+        console.error('Error parsing data:', error);
+        setError('Error parsing data');
+      }
     }
-    const parsedValue = JSON.parse(parsedData);
-    // Check if parsedValue is not null before accessing properties
-    if (parsedValue !== null && typeof parsedValue === 'object') {
-      console.log(parsedValue);
-      setcallbacksize(parsedValue.ota_size);
-      setReceivedData(parsedValue.msg_status);
-      setSegmentCallback(parsedValue.Segment);
-      setTotalByte(parsedValue.Total_byte);
-      setUseByte(parsedValue.Use_byte);
-    } else {
-      console.error('parsedValue is null or not an object');
-    }
-  },[parsedData])
+  }, [parsedData, fileInput]);
 
   return (
     <div className="flex items-center justify-center h-screen">
@@ -149,14 +155,13 @@ const sendFile = async () => {
             <div>
               <p className="text-lg md:text-xl lg:text-2xl">Connected to: {device.name}</p>
               <p>Received Data: {receivedData}</p>
-              <p>Ota Size callback: {callbacksize}</p>
-              <p>Segment callback: {SegmentCallback}</p>
-              <p>Total Byte: {TotalByte}</p>
-              <p>Use Byte: {UseByte}</p>
+              <p>OTA Size callback: {callbackSize}</p>
+              <p>Segment callback: {segmentCallback}</p>
+              <p>Total Byte: {totalByte}</p>
+              <p>Use Byte: {useByte}</p>
               <progress className="progress progress-error" value={loadPercent} max="100"></progress>
               <p>Installing: {loadPercent.toFixed(2)} %</p>
             </div>
-  
             <div className='flex flex-col md:flex-row gap-1 pt-4 md:pt-6 lg:pt-9'>
               <input type="file" accept=".bin" onChange={(e) => setFileInput(e.target)} className="mb-2 md:mb-0" />
               {fileInput && fileInput.files && fileInput.files.length > 0 && (
@@ -167,15 +172,13 @@ const sendFile = async () => {
                 <input
                   type="number"
                   value={chunkSize}
-                  onChange={(e) => setchunkSize(parseInt(e.target.value, 10))}
+                  onChange={(e) => setChunkSize(parseInt(e.target.value, 10))}
                   className="mb-2 md:mb-0 ml-2 md:ml-4"
                 />
               </label>
               <button className='btn btn-primary mb-2 md:mb-0 ml-2 md:ml-4' onClick={sendFile}>Send File</button>
               <button className='btn btn-primary mb-2 md:mb-0 ml-2 md:ml-4' onClick={disconnectDevice}>Disconnect</button>
-              <button className='btn btn-primary mb-2 md:mb-0 ml-2 md:ml-4' id='sendButton'>SendNextChunk</button>
             </div>
-  
           </div>
         ) : (
           <div className='pt-6 md:pt-10 lg:pt-20'>
