@@ -6,7 +6,7 @@ const App = () => {
   const [receivedData, setReceivedData] = useState('');
   const [error, setError] = useState('');
   const [fileInput, setFileInput] = useState(null);
-  const [chunkSize, setchunkSize] = useState(512);
+  const [chunkSize, setchunkSize] = useState(128);
   const [callbacksize, setcallbacksize] = useState(0)
   const [parsedData, setParsedData] = useState(null);
   const [SegmentCallback, setSegmentCallback] = useState(0);
@@ -14,24 +14,30 @@ const App = () => {
   const [TotalByte, setTotalByte] = useState(0);
   const [UseByte, setUseByte] = useState(0);
 
+  const uuid_service = 0x0180;
+  const uuid_rx = 0xDEAD; //uuid to receive data from eap32 0xDEAD
+  const uuid_tx = 0xFEF4; //uuid tx to tranfer data to esp32 0xFEF4
+
   const connectToDevice = async () => {
     try {
       const device = await navigator.bluetooth.requestDevice({
         filters: [{ name: 'ESP32 dev' }],
+        //acceptAllDevices: true,
+        optionalServices: [uuid_service]
       });
 
       console.log('Connecting to GATT server...');
       const server = await device.gatt.connect();
 
       console.log('Getting primary service...');
-      const service = await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
+      const service = await server.getPrimaryService(uuid_service);
 
       console.log('Getting ota service...');
-      const characteristic = await service.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
+      const characteristic = await service.getCharacteristic(uuid_rx);
       console.log('Characteristic Properties:', characteristic.properties);
 
       console.log('Getting callback_ota_size...');
-      const callback_ota_size = await service.getCharacteristic('e32d6400-0a1c-43af-a591-8634cc4b7af4');
+      const callback_ota_size = await service.getCharacteristic(uuid_tx);
 
 
       setDevice(device);
